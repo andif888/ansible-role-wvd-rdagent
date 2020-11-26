@@ -1,8 +1,8 @@
 ansible-role-wvd-rdagent
 =========
 
-Installes Powershell Core 7 and Windows Virtual Desktop RDAgent, RDAgent Bootloader. 
-Registers the machine at the WVD host pool.
+Installes Powershell Core 7 and Windows Virtual Desktop RDAgent, RDAgent Bootloader.   
+The machine registers it self at the WVD host pool.
 
 Requirements
 ------------
