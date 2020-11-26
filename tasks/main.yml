@@ -1,0 +1,98 @@
+---
+# tasks file for ansible-role-wvd-rdagent
+- name: install powershell core
+  win_package:
+    path: '{{ powershell_core_download_url }}'
+    product_id: '{{ powershell_core_product_id }}'
+    state: present
+    arguments: '/quiet ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL={{ powershell_core_add_explorer_context_menu_openpowershell }} ENABLE_PSREMOTING={{ powershell_core_enable_psremoting }} REGISTER_MANIFEST={{ powershell_core_register_manifest }}'
+  ignore_errors: yes
+  register: powershell_core_install_result
+
+- name: Wait 60 seconds, but only start checking after 3 seconds
+  wait_for_connection:
+    delay: 3
+    timeout: 60
+  when: powershell_core_install_result.rc != 0
+
+- name: install powershell core (2nd try)
+  win_package:
+    path: '{{ powershell_core_download_url }}'
+    product_id: '{{ powershell_core_product_id }}'
+    state: present
+    arguments: '/quiet ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL={{ powershell_core_add_explorer_context_menu_openpowershell }} ENABLE_PSREMOTING={{ powershell_core_enable_psremoting }} REGISTER_MANIFEST={{ powershell_core_register_manifest }}'
+  register: powershell_core_install_result2
+  when: powershell_core_install_result.rc != 0
+
+- name: Test powershell core
+  win_shell: |
+    get-host
+  args:
+    executable: '{{ powershell_core_executable }}'
+  changed_when: False
+
+
+- name: PSGallery set trusted
+  win_shell: | 
+    Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
+  args:
+    executable: '{{ powershell_core_executable }}'
+
+- name: Get-AzWvdRegistrationInfo
+  win_shell: | 
+    Install-Module -name Az.DesktopVirtualization -Confirm:$false | out-null
+    $SecureStringPassword = ConvertTo-SecureString "{{ wvd_rdagent_client_secret }}" -AsPlainText -Force
+    $pscredential = New-Object System.Management.Automation.PSCredential -ArgumentList "{{ wvd_rdagent_client_id }}", $SecureStringPassword
+    Connect-AzAccount -ServicePrincipal -Credential $pscredential -Tenant "{{ wvd_rdagent_tenant_id }}" | out-null
+    
+    # New-AzWvdRegistrationInfo -ResourceGroupName "{{ wvd_rdagent_resource_group }}" -HostPoolName "{{ wvd_rdagent_host_pool }}" -SubscriptionId "{{ wvd_rdagent_subscription_id }}" -ExpirationTime $((get-date).ToUniversalTime().AddHours(2).ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ')) | out-null
+    $token = Get-AzWvdRegistrationInfo -ResourceGroupName "{{ wvd_rdagent_resource_group }}" -HostPoolName "{{ wvd_rdagent_host_pool }}" -SubscriptionId "{{ wvd_rdagent_subscription_id }}"
+    
+    Write-Host $token.Token      
+  args:
+    executable: '{{ powershell_core_executable }}'
+  register: az_wvd_registrationinfo_token
+  tags:
+    - wvd-rdagent-registrationinfo
+
+- debug:
+    msg: "{{ az_wvd_registrationinfo_token.stdout_lines | list | last | trim }}"
+  tags:
+    - wvd-rdagent-registrationinfo
+
+- name: Download WVD RDAgent
+  win_get_url:
+    url: '{{ wvd_rdagent_download_url }}'
+    dest: '{{ wvd_rdagent_path_zip }}'
+    force: no
+  tags: 
+    - wvd-rdagent-extract-only
+
+- name: Unzip WVD RDAgent
+  win_unzip:
+    src: '{{ wvd_rdagent_path_zip }}'
+    dest: '{{ wvd_rdagent_extract_dir }}'
+  tags: 
+    - wvd-rdagent-extract-only
+
+- name: Install WVD RDAgent
+  win_package:
+    path: '{{ wvd_rdagent_installer_path }}'
+    product_id: '{{ wvd_rdagent_product_id }}'
+    state: present
+    arguments: '/quiet /qn /norestart /passive REGISTRATIONTOKEN={{ az_wvd_registrationinfo_token.stdout_lines | list | last | trim }}'
+  register: win_package_wvd_agent
+  when:
+    - az_wvd_registrationinfo_token is defined
+    - az_wvd_registrationinfo_token.stdout_lines is defined
+
+- name: Install WVD RDAgent Bootloader
+  win_package:
+    path: '{{ wvd_rdagent_bootloader_installer_path }}'
+    product_id: '{{ wvd_rdagent_bootloader_product_id }}'
+    state: present
+    arguments: '/quiet /qn /norestart /passive'
+  register: win_package_wvd_rdagent_bootloader
+  when:
+    - az_wvd_registrationinfo_token is defined
+    - az_wvd_registrationinfo_token.stdout_lines is defined
