@@ -45,7 +45,7 @@
     $pscredential = New-Object System.Management.Automation.PSCredential -ArgumentList "{{ wvd_rdagent_client_id }}", $SecureStringPassword
     Connect-AzAccount -ServicePrincipal -Credential $pscredential -Tenant "{{ wvd_rdagent_tenant_id }}" | out-null
     
-    # New-AzWvdRegistrationInfo -ResourceGroupName "{{ wvd_rdagent_resource_group }}" -HostPoolName "{{ wvd_rdagent_host_pool }}" -SubscriptionId "{{ wvd_rdagent_subscription_id }}" -ExpirationTime $((get-date).ToUniversalTime().AddHours(2).ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ')) | out-null
+    New-AzWvdRegistrationInfo -ResourceGroupName "{{ wvd_rdagent_resource_group }}" -HostPoolName "{{ wvd_rdagent_host_pool }}" -SubscriptionId "{{ wvd_rdagent_subscription_id }}" -ExpirationTime $((get-date).ToUniversalTime().AddHours(2).ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ')) | out-null
     $token = Get-AzWvdRegistrationInfo -ResourceGroupName "{{ wvd_rdagent_resource_group }}" -HostPoolName "{{ wvd_rdagent_host_pool }}" -SubscriptionId "{{ wvd_rdagent_subscription_id }}"
     
     Write-Host $token.Token      
