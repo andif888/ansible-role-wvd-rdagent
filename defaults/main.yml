@@ -9,30 +9,25 @@ wvd_rdagent_client_secret: "79823472389432432324"
 wvd_rdagent_resource_group: my_resource_group
 wvd_rdagent_host_pool: my_wvd_host_pool
 
-
-# usually no adjustments necessary
-wvd_rdagent_product_id: "{11765DD9-A81B-481C-B783-6F3C56A4CB88}"
-wvd_rdagent_bootloader_product_id: "{A38EE409-424D-4A0D-B5B6-5D66F20F62A5}"
-wvd_rdagent_installer_msi: Microsoft.RDInfra.RDAgent.Installer-x64-1.0.2548.6500.msi
-wvd_rdagent_bootloader_installer_msi: Microsoft.RDInfra.RDAgentBootLoader.Installer-x64.msi
-
-wvd_rdagent_unzip_subfoldername: DeployAgent
-wvd_rdagent_filename_zip: '{{ wvd_rdagent_unzip_subfoldername }}.zip'
-wvd_rdagent_download_url: 'https://raw.githubusercontent.com/Azure/RDS-Templates/master/ARM-wvd-templates/DSC/{{ wvd_rdagent_filename_zip }}'
-wvd_rdagent_download_dest_dir: '{{ ansible_env.SystemRoot }}\Temp'
-wvd_rdagent_path_zip: '{{ wvd_rdagent_download_dest_dir }}\{{ wvd_rdagent_filename_zip }}'
-wvd_rdagent_extract_dir: '{{ wvd_rdagent_download_dest_dir }}\{{ wvd_rdagent_unzip_subfoldername }}'
-wvd_rdagent_installer_path: '{{ wvd_rdagent_download_dest_dir }}\{{ wvd_rdagent_unzip_subfoldername }}\RDInfraAgentInstall\{{ wvd_rdagent_installer_msi }}'
-wvd_rdagent_bootloader_installer_path: '{{ wvd_rdagent_download_dest_dir }}\{{ wvd_rdagent_unzip_subfoldername }}\RDAgentBootLoaderInstall\{{ wvd_rdagent_bootloader_installer_msi }}'
-
-
-powershell_core_version: 7.1.0
+# Powershell Core
+powershell_core_version: 7.4.1
 powershell_core_download_url: 'https://github.com/PowerShell/PowerShell/releases/download/v{{ powershell_core_version }}/PowerShell-{{ powershell_core_version }}-win-x64.msi'
-powershell_core_product_id: "{8B34F593-C5DF-47D9-AD0E-23D579F6D83E}"
+powershell_core_product_id: "{B06D1894-3827-4E0C-A092-7DC50BE8B210}"
 powershell_core_add_explorer_context_menu_openpowershell: 1
 powershell_core_enable_psremoting: 1
 powershell_core_register_manifest: 1
 powershell_core_executable: '{{ ansible_env.ProgramFiles }}\PowerShell\7\pwsh.exe'
 
+# Azure Virtual Desktop Agent
+wvd_rdagent_download_dir: '{{ ansible_env.SystemRoot }}\Temp\wvdagent'
+wvd_rdagent_download_url: "https://query.prod.cms.rt.microsoft.com/cms/api/am/binary/RWrmXv"
+wvd_rdagent_download_filename: "Microsoft.RDInfra.RDAgent.Installer-x64.msi"
+wvd_rdagent_install_arguments: "/quiet /qn /norestart /passive"
+wvd_rdagent_install_product_id: "{D8A1F8FE-6022-405C-83EF-5504E8FAB3BC}"
 
-
+# Azure Virtual Desktop Agent Bootloader
+wvd_rdagentbootloader_download_dir: '{{ ansible_env.SystemRoot }}\Temp\wvdagent'
+wvd_rdagentbootloader_download_url: "https://query.prod.cms.rt.microsoft.com/cms/api/am/binary/RWrxrH"
+wvd_rdagentbootloader_download_filename: "Microsoft.RDInfra.RDAgentBootLoader.Installer-x64.msi"
+wvd_rdagentbootloader_install_arguments: "/quiet /qn /norestart /passive"
+wvd_rdagentbootloader_install_product_id: "{41439A3F-FED7-478A-A71B-8E15AF8A6607}"

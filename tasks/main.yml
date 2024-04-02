@@ -1,7 +1,7 @@
 ---
 # tasks file for ansible-role-wvd-rdagent
 - name: install powershell core
-  win_package:
+  ansible.windows.win_package:
     path: '{{ powershell_core_download_url }}'
     product_id: '{{ powershell_core_product_id }}'
     state: present
@@ -16,7 +16,7 @@
   when: powershell_core_install_result.rc != 0
 
 - name: install powershell core (2nd try)
-  win_package:
+  ansible.windows.win_package:
     path: '{{ powershell_core_download_url }}'
     product_id: '{{ powershell_core_product_id }}'
     state: present
@@ -25,7 +25,7 @@
   when: powershell_core_install_result.rc != 0
 
 - name: Test powershell core
-  win_shell: |
+  ansible.windows.win_shell: |
     get-host
   args:
     executable: '{{ powershell_core_executable }}'
@@ -33,13 +33,13 @@
 
 
 - name: PSGallery set trusted
-  win_shell: | 
+  ansible.windows.win_shell: | 
     Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
   args:
     executable: '{{ powershell_core_executable }}'
 
 - name: Get-AzWvdRegistrationInfo
-  win_shell: | 
+  ansible.windows.win_shell: | 
     Install-Module -name Az.DesktopVirtualization -Confirm:$false | out-null
     $SecureStringPassword = ConvertTo-SecureString "{{ wvd_rdagent_client_secret }}" -AsPlainText -Force
     $pscredential = New-Object System.Management.Automation.PSCredential -ArgumentList "{{ wvd_rdagent_client_id }}", $SecureStringPassword
@@ -60,39 +60,92 @@
   tags:
     - wvd-rdagent-registrationinfo
 
-- name: Download WVD RDAgent
-  win_get_url:
-    url: '{{ wvd_rdagent_download_url }}'
-    dest: '{{ wvd_rdagent_path_zip }}'
-    force: no
-  tags: 
-    - wvd-rdagent-extract-only
 
-- name: Unzip WVD RDAgent
-  win_unzip:
-    src: '{{ wvd_rdagent_path_zip }}'
-    dest: '{{ wvd_rdagent_extract_dir }}'
-  tags: 
-    - wvd-rdagent-extract-only
+- name: Ensure {{ wvd_rdagent_download_dir }} exists
+  ansible.windows.win_file:
+    path: "{{ wvd_rdagent_download_dir }}"
+    state: directory
 
-- name: Install WVD RDAgent
-  win_package:
-    path: '{{ wvd_rdagent_installer_path }}'
-    product_id: '{{ wvd_rdagent_product_id }}'
-    state: present
-    arguments: '/quiet /qn /norestart /passive REGISTRATIONTOKEN={{ az_wvd_registrationinfo_token.stdout_lines | list | last | trim }}'
-  register: win_package_wvd_agent
-  when:
-    - az_wvd_registrationinfo_token is defined
-    - az_wvd_registrationinfo_token.stdout_lines is defined
+- name: Install AVD Agent and Bootloader
+  block:
+    - name: Download Azure Virtual Desktop Agent {{ wvd_rdagent_download_url }}
+      ansible.windows.win_get_url:
+        follow_redirects: "{{ wvd_rdagent_follow_redirects | default(omit) }}"
+        force: "{{ wvd_rdagent_download_force | default(omit) }}"
+        dest: '{{ wvd_rdagent_download_dir }}\{{ wvd_rdagent_download_filename }}'
+        url: "{{ wvd_rdagent_download_url }}"
+        validate_certs: '{{ validate_certs | default(omit) }}'
+        proxy_password: '{{ proxy_password | default(omit) }}'
+        proxy_url : '{{ proxy_url  | default(omit) }}'
+        proxy_use_default_credential: '{{ proxy_use_default_credential | default(omit) }}'
+        proxy_username: '{{ proxy_username | default(omit) }}'
+      register: wvd_rdagent_download_result
 
-- name: Install WVD RDAgent Bootloader
-  win_package:
-    path: '{{ wvd_rdagent_bootloader_installer_path }}'
-    product_id: '{{ wvd_rdagent_bootloader_product_id }}'
-    state: present
-    arguments: '/quiet /qn /norestart /passive'
-  register: win_package_wvd_rdagent_bootloader
+    - name: Debug wvd_rdagent_download_result
+      ansible.builtin.debug:
+        var: wvd_rdagent_download_result
+
+    - name: Install package for {{ wvd_rdagent_download_url }}
+      ansible.windows.win_package:
+        arguments: "{{ wvd_rdagent_install_arguments }} REGISTRATIONTOKEN={{ az_wvd_registrationinfo_token.stdout_lines | list | last | trim }}"
+        chdir: "{{ wvd_rdagent_install_chdir | default(omit) }}"
+        creates_path: "{{ wvd_rdagent_install_creates_path | default(omit) }}"
+        creates_service: "{{ wvd_rdagent_install_creates_service | default(omit) }}"
+        creates_version: "{{ wvd_rdagent_install_creates_version | default(omit) }}"
+        expected_return_codes: "{{ wvd_rdagent_install_expected_return_codes | default(omit) }}"
+        follow_redirects: "{{ wvd_rdagent_install_follow_redirects | default(omit) }}"
+        log_path: "{{ wvd_rdagent_install_log_path | default(omit) }}"
+        path: "{{ wvd_rdagent_download_result.dest }}"
+        product_id: "{{ wvd_rdagent_install_product_id | default(omit) }}"
+        provider: "{{ wvd_rdagent_install_provider | default(omit) }}"
+        state: "{{ wvd_rdagent_install_state | default('present') }}"
+        validate_certs: "{{ wvd_rdagent_install_validate_certs | default(omit) }}"
+        wait_for_children: "{{ wvd_rdagent_install_wait_for_children | default(omit) }}"
+      register: wvd_rdagent_install_package_result
+
+    - name: Debug wvd_rdagent_install_package_result
+      ansible.builtin.debug:
+        var: wvd_rdagent_install_package_result
+
+
+    - name: Download Azure Virtual Desktop Agent Bootloader {{ wvd_rdagentbootloader_download_url }}
+      ansible.windows.win_get_url:
+        follow_redirects: "{{ wvd_rdagentbootloader_follow_redirects | default(omit) }}"
+        force: "{{ wvd_rdagentbootloader_download_force | default(omit) }}"
+        dest: '{{ wvd_rdagentbootloader_download_dir }}\{{ wvd_rdagentbootloader_download_filename }}'
+        url: "{{ wvd_rdagentbootloader_download_url }}"
+        validate_certs: '{{ validate_certs | default(omit) }}'
+        proxy_password: '{{ proxy_password | default(omit) }}'
+        proxy_url : '{{ proxy_url  | default(omit) }}'
+        proxy_use_default_credential: '{{ proxy_use_default_credential | default(omit) }}'
+        proxy_username: '{{ proxy_username | default(omit) }}'
+      register: wvd_rdagentbootloader_download_result
+
+    - name: Debug wvd_rdagentbootloader_download_result
+      ansible.builtin.debug:
+        var: wvd_rdagentbootloader_download_result
+
+    - name: Install package for {{ wvd_rdagentbootloader_download_url }}
+      ansible.windows.win_package:
+        arguments: "{{ wvd_rdagentbootloader_install_arguments | default(omit) }}"
+        chdir: "{{ wvd_rdagentbootloader_install_chdir | default(omit) }}"
+        creates_path: "{{ wvd_rdagentbootloader_install_creates_path | default(omit) }}"
+        creates_service: "{{ wvd_rdagentbootloader_install_creates_service | default(omit) }}"
+        creates_version: "{{ wvd_rdagentbootloader_install_creates_version | default(omit) }}"
+        expected_return_codes: "{{ wvd_rdagentbootloader_install_expected_return_codes | default(omit) }}"
+        follow_redirects: "{{ wvd_rdagentbootloader_install_follow_redirects | default(omit) }}"
+        log_path: "{{ wvd_rdagentbootloader_install_log_path | default(omit) }}"
+        path: "{{ wvd_rdagentbootloader_download_result.dest }}"
+        product_id: "{{ wvd_rdagentbootloader_install_product_id | default(omit) }}"
+        provider: "{{ wvd_rdagentbootloader_install_provider | default(omit) }}"
+        state: "{{ wvd_rdagentbootloader_install_state | default('present') }}"
+        validate_certs: "{{ wvd_rdagentbootloader_install_validate_certs | default(omit) }}"
+        wait_for_children: "{{ wvd_rdagentbootloader_install_wait_for_children | default(omit) }}"
+      register: wvd_rdagentbootloader_install_package_result
+
+    - name: Debug wvd_rdagentbootloader_install_package_result
+      ansible.builtin.debug:
+        var: wvd_rdagentbootloader_install_package_result
   when:
     - az_wvd_registrationinfo_token is defined
     - az_wvd_registrationinfo_token.stdout_lines is defined
